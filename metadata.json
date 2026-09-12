@@ -1,0 +1,6 @@
+{
+  "name": "AttendX",
+  "description": "Multi-semester attendance management system. Mark past and present classes, configure monthly teaching day calendars, track attendance rates compared to 100%, and switch between semesters with full data isolation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

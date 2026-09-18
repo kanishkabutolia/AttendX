@@ -171,49 +171,6 @@ export default function App() {
     });
   };
 
-  const handleExportData = () => {
-    try {
-      const dataStr = JSON.stringify(semesters, null, 2);
-      const blob = new Blob([dataStr], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `attendx-backup-${formatDate(new Date())}.json`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error(err);
-      alert('Could not export backup.');
-    }
-  };
-
-  const handleImportData = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const content = event.target?.result as string;
-        const parsed = JSON.parse(content);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const cleaned = parsed.map(cleanSemesterData);
-          setSemesters(cleaned);
-          setActiveSemesterId(cleaned[0].id);
-          alert('AttendX backup successfully restored!');
-        } else {
-          alert('Invalid backup format. Please select a valid AttendX JSON export.');
-        }
-      } catch (err) {
-        console.error(err);
-        alert('Could not read backup file.');
-      }
-    };
-    reader.readAsText(file);
-    e.target.value = '';
-  };
-
   const handleResetToClean = () => {
     updateCurrentSemester(() => ({
       subjects: [],
@@ -427,8 +384,6 @@ export default function App() {
           setEditingSubject(null);
           setIsAddModalOpen(true);
         }}
-        onExportData={handleExportData}
-        onImportData={handleImportData}
         onResetData={handleResetData}
         overallPercentage={overallStats.percentage}
         overallRecoveryNeeded={overallStats.recoveryNeeded}

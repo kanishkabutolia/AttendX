@@ -26,6 +26,7 @@ export const SubjectCard: React.FC<SubjectCardProps> = ({
   onEdit,
   onDelete,
   onOpenSimulator,
+  onMarkToday,
 }) => {
   const { subject, totalConducted, presentCount, absentCount, percentage, isAboveTarget } = stats;
   const colorTheme = COLOR_MAP[subject.color] || COLOR_MAP.emerald;
@@ -187,6 +188,35 @@ export const SubjectCard: React.FC<SubjectCardProps> = ({
             <span>Calculator</span>
           </button>
         </div>
+
+        {/* Quick 1-Click Mark for Today */}
+        {onMarkToday && (
+          <div className="mt-3 flex items-center justify-between gap-2 border-t border-slate-100 pt-2.5 dark:border-slate-800/80">
+            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+              Today:
+            </span>
+            <div className="flex items-center gap-1.5">
+              <button
+                id={`mark-today-present-${subject.id}`}
+                onClick={() => onMarkToday(subject.id, 'present')}
+                title="Mark Present for Today"
+                className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700 hover:bg-emerald-100 active:scale-95 transition-all dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-900/60"
+              >
+                <Plus className="h-3 w-3" />
+                <span>Present</span>
+              </button>
+              <button
+                id={`mark-today-absent-${subject.id}`}
+                onClick={() => onMarkToday(subject.id, 'absent')}
+                title="Mark Absent for Today"
+                className="inline-flex items-center gap-1 rounded-lg bg-rose-50 px-2.5 py-1 text-[11px] font-bold text-rose-700 hover:bg-rose-100 active:scale-95 transition-all dark:bg-rose-950/40 dark:text-rose-300 dark:hover:bg-rose-900/60"
+              >
+                <Minus className="h-3 w-3" />
+                <span>Absent</span>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

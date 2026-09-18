@@ -33,7 +33,7 @@ export const DailyAttendanceMarking: React.FC<DailyAttendanceMarkingProps> = ({
   onClearDateRecords,
   onToggleTeachingDay,
 }) => {
-  const TODAY_STR = '2026-09-12';
+  const TODAY_STR = formatDate(new Date());
   const [selectedDate, setSelectedDate] = useState<string>(TODAY_STR);
 
   const currentDateObj = parseDate(selectedDate);
@@ -67,23 +67,25 @@ export const DailyAttendanceMarking: React.FC<DailyAttendanceMarkingProps> = ({
 
   // Generate list of recent past days for instant 1-tap jump
   const recentDaysList = [
-    { offset: 0, label: 'Today', subLabel: 'Sep 12' },
-    { offset: -1, label: 'Yesterday', subLabel: 'Sep 11' },
-    { offset: -2, label: '2 Days Ago', subLabel: 'Sep 10' },
-    { offset: -3, label: '3 Days Ago', subLabel: 'Sep 09' },
-    { offset: -4, label: '4 Days Ago', subLabel: 'Sep 08' },
-    { offset: -5, label: '5 Days Ago', subLabel: 'Sep 07' },
-    { offset: -6, label: '6 Days Ago', subLabel: 'Sep 06' },
+    { offset: 0, label: 'Today' },
+    { offset: -1, label: 'Yesterday' },
+    { offset: -2, label: '2 Days Ago' },
+    { offset: -3, label: '3 Days Ago' },
+    { offset: -4, label: '4 Days Ago' },
+    { offset: -5, label: '5 Days Ago' },
+    { offset: -6, label: '6 Days Ago' },
   ].map((item) => {
     const d = parseDate(TODAY_STR);
     d.setDate(d.getDate() + item.offset);
     const dateKey = formatDate(d);
+    const subLabel = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     const dayRecords = records.filter((r) => r.date === dateKey);
     const markedCount = dayRecords.length;
     const hasAbsence = dayRecords.some((r) => r.status === 'absent');
     const allPresent = markedCount > 0 && dayRecords.every((r) => r.status === 'present');
     return {
       ...item,
+      subLabel,
       dateKey,
       markedCount,
       hasAbsence,

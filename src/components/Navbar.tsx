@@ -6,6 +6,7 @@ import {
   BarChart3,
   Calculator,
   Plus,
+  Sparkles,
   GraduationCap,
   ChevronDown,
   Check,
@@ -19,6 +20,7 @@ interface NavbarProps {
   activeTab: NavTab;
   onTabChange: (tab: NavTab) => void;
   onOpenAddSubject: () => void;
+  onOpenPresets?: () => void;
   onResetData: () => void;
   overallPercentage: number;
   overallRecoveryNeeded: number;
@@ -33,6 +35,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   activeTab,
   onTabChange,
   onOpenAddSubject,
+  onOpenPresets,
   overallPercentage,
   semesters = [],
   activeSemesterId,
@@ -252,6 +255,19 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span className="font-bold">{overallPercentage}%</span>
               <span className="hidden sm:inline text-[10px] opacity-70">/ 100%</span>
             </div>
+
+            {/* Presets / Quick Setup Button */}
+            {onOpenPresets && (
+              <button
+                id="open-presets-btn"
+                onClick={onOpenPresets}
+                title="Curriculum Presets & Templates"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-all shadow-2xs shrink-0"
+              >
+                <Sparkles className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                <span className="hidden sm:inline">Curricula</span>
+              </button>
+            )}
 
             {/* Add Subject Primary CTA */}
             <button

@@ -40,6 +40,8 @@ import { RecoverySimulator } from './components/RecoverySimulator';
 import { AddSubjectModal } from './components/AddSubjectModal';
 import { AddSemesterModal } from './components/AddSemesterModal';
 import { DeleteSemesterModal } from './components/DeleteSemesterModal';
+import { CurriculumPresetsModal } from './components/CurriculumPresetsModal';
+import { buildReadyToUseSemester } from './data/curriculaPresets';
 
 const STORAGE_KEYS = {
   SEMESTERS: 'student_attendance_semesters_v2',
@@ -106,17 +108,20 @@ const getInitialSemesters = (): SemesterData[] => {
     if (saved) {
       const parsed = JSON.parse(saved);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        const cleaned = parsed.map(cleanSemesterData);
-        localStorage.setItem(STORAGE_KEYS.SEMESTERS, JSON.stringify(cleaned));
-        return cleaned;
+        // If there is an existing semester with subjects, keep user's configured state
+        const hasSubjects = parsed.some((s) => s.subjects && s.subjects.length > 0);
+        if (hasSubjects) {
+          return parsed;
+        }
       }
     }
-    const initial = [createCleanSemester()];
+    // Out of the box, provide a complete, ready-to-use curriculum so users can directly use & deploy without typing
+    const initial = [buildReadyToUseSemester('cs', new Date())];
     localStorage.setItem(STORAGE_KEYS.SEMESTERS, JSON.stringify(initial));
     return initial;
   } catch (e) {
     console.error(e);
-    return [createCleanSemester()];
+    return [buildReadyToUseSemester('cs', new Date())];
   }
 };
 
@@ -125,9 +130,9 @@ export default function App() {
   const [activeSemesterId, setActiveSemesterId] = useState<string>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.ACTIVE_SEM);
-      if (saved && saved !== 'sem-5') return saved;
+      if (saved) return saved;
     } catch (e) {}
-    return 'sem-1';
+    return 'sem-cs-1';
   });
 
   // Current active semester data
@@ -148,6 +153,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
   const [simulatorSubjectId, setSimulatorSubjectId] = useState<string | undefined>(undefined);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isPresetsModalOpen, setIsPresetsModalOpen] = useState(false);
   const [isAddSemesterModalOpen, setIsAddSemesterModalOpen] = useState(false);
   const [semesterToDelete, setSemesterToDelete] = useState<SemesterData | null>(null);
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
@@ -185,6 +191,27 @@ export default function App() {
     });
   };
 
+  // Switch to a preloaded curriculum preset
+  const handleApplyPreset = (presetId: string) => {
+    const newSemester = buildReadyToUseSemester(presetId, new Date());
+    updateCurrentSemester(() => ({
+      name: newSemester.name,
+      startDate: newSemester.startDate,
+      endDate: newSemester.endDate,
+      subjects: newSemester.subjects,
+      records: newSemester.records,
+      teachingDays: newSemester.teachingDays,
+    }));
+  };
+
+  const handleResetToClean = () => {
+    updateCurrentSemester(() => ({
+      subjects: [],
+      records: [],
+      teachingDays: {},
+    }));
+  };
+
   // Overall Statistics calculated on a 100% scale
   const overallStats = computeOverallStats(subjects, records, 100);
   const subjectStatsList: SubjectStats[] = subjects.map((subj) =>
@@ -194,10 +221,23 @@ export default function App() {
   const subjectsWithAbsence = subjectStatsList.filter((s) => s.absentCount > 0);
   const subjectsPerfect = subjectStatsList.filter((s) => s.absentCount === 0);
 
-  // Quick mark today
+  // Quick mark today for single subject
   const handleMarkToday = (subjectId: string, status: 'present' | 'absent') => {
-    const todayStr = formatDate(new Date('2026-09-12'));
+    const todayStr = formatDate(new Date());
     handleUpdateRecord(todayStr, subjectId, status);
+  };
+
+  // Mark all today's scheduled classes present in 1 tap
+  const handleMarkAllTodayPresent = () => {
+    const todayStr = formatDate(new Date());
+    const dayOfWeek = new Date().getDay();
+    const scheduledToday = subjects.filter(
+      (s) => !s.scheduledDays || s.scheduledDays.length === 0 || s.scheduledDays.includes(dayOfWeek)
+    );
+    const toMark = scheduledToday.length > 0 ? scheduledToday : subjects;
+    toMark.forEach((subj) => {
+      handleUpdateRecord(todayStr, subj.id, 'present');
+    });
   };
 
   // Generic record update
@@ -347,6 +387,7 @@ export default function App() {
           setEditingSubject(null);
           setIsAddModalOpen(true);
         }}
+        onOpenPresets={() => setIsPresetsModalOpen(true)}
         onResetData={handleResetData}
         overallPercentage={overallStats.percentage}
         overallRecoveryNeeded={overallStats.recoveryNeeded}
@@ -659,6 +700,27 @@ export default function App() {
                 </div>
 
                 <button
+                  id="dashboard-mark-all-today-btn"
+                  onClick={handleMarkAllTodayPresent}
+                  title="Mark all today's scheduled classes as Present in one click"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-emerald-700 active:scale-95 transition-all shrink-0"
+                >
+                  <CheckCheck className="h-4 w-4 shrink-0" />
+                  <span className="hidden xs:inline">Mark Today</span>
+                  <span className="xs:hidden">Today</span>
+                </button>
+
+                <button
+                  id="dashboard-curricula-presets-btn"
+                  onClick={() => setIsPresetsModalOpen(true)}
+                  title="Browse or switch academic curricula presets"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-all shrink-0"
+                >
+                  <Sparkles className="h-4 w-4 text-amber-500 shrink-0" />
+                  <span className="hidden xs:inline">Curricula</span>
+                </button>
+
+                <button
                   id="dashboard-add-subject-btn"
                   onClick={() => {
                     setEditingSubject(null);
@@ -683,25 +745,35 @@ export default function App() {
                     ? 'Great news! No missed classes in any subject.'
                     : dashboardFilter === 'perfect'
                     ? 'No subjects currently at 100% attendance.'
-                    : `No subjects added in ${currentSemester.name} yet.`}
+                    : `No subjects in ${currentSemester.name} yet.`}
                 </h3>
                 <p className="mt-1 text-xs text-slate-500 max-w-sm mx-auto">
                   {dashboardFilter === 'all'
-                    ? 'Start tracking your lectures, calculating absences, and maintaining full 100% attendance by adding your courses.'
+                    ? 'Load a pre-configured university curriculum preset in one click, or add your own custom courses.'
                     : 'Switch filters or add new courses to see them here.'}
                 </p>
                 {dashboardFilter === 'all' && (
-                  <button
-                    id="empty-state-add-course-btn"
-                    onClick={() => {
-                      setEditingSubject(null);
-                      setIsAddModalOpen(true);
-                    }}
-                    className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-blue-700 transition-all active:scale-95"
-                  >
-                    <Plus className="h-4 w-4" />
-                    <span>Add First Course</span>
-                  </button>
+                  <div className="mt-5 flex flex-wrap items-center justify-center gap-2.5">
+                    <button
+                      id="empty-state-load-preset-btn"
+                      onClick={() => setIsPresetsModalOpen(true)}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:from-blue-700 hover:to-indigo-700 transition-all active:scale-95"
+                    >
+                      <Sparkles className="h-4 w-4 text-amber-300" />
+                      <span>Load Curriculum Preset</span>
+                    </button>
+                    <button
+                      id="empty-state-add-course-btn"
+                      onClick={() => {
+                        setEditingSubject(null);
+                        setIsAddModalOpen(true);
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 transition-all active:scale-95"
+                    >
+                      <Plus className="h-4 w-4" />
+                      <span>Add Course</span>
+                    </button>
+                  </div>
                 )}
               </div>
             ) : (
@@ -801,6 +873,15 @@ export default function App() {
         onClose={() => setSemesterToDelete(null)}
         onConfirmDelete={handleConfirmDeleteSemester}
         isOnlySemester={semesters.length <= 1}
+      />
+
+      {/* Curriculum Presets & Templates Modal */}
+      <CurriculumPresetsModal
+        isOpen={isPresetsModalOpen}
+        onClose={() => setIsPresetsModalOpen(false)}
+        onSelectPreset={handleApplyPreset}
+        onResetToClean={handleResetToClean}
+        currentSubjectCount={subjects.length}
       />
     </div>
   );

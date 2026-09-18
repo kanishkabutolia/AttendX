@@ -139,6 +139,38 @@ export function generateTeachingDaysRange(
   return result;
 }
 
+export function getCurrentAcademicSemesterDates(baseDate: Date = new Date()): {
+  name: string;
+  startDate: string;
+  endDate: string;
+} {
+  const year = baseDate.getFullYear();
+  const month = baseDate.getMonth(); // 0-indexed: 0 = Jan, 8 = Sep
+
+  if (month >= 0 && month <= 4) {
+    // Spring Semester: Jan to May
+    return {
+      name: 'Spring Semester',
+      startDate: `${year}-01-10`,
+      endDate: `${year}-05-31`,
+    };
+  } else if (month >= 5 && month <= 6) {
+    // Summer Term: Jun to Jul
+    return {
+      name: 'Summer Term',
+      startDate: `${year}-06-01`,
+      endDate: `${year}-07-31`,
+    };
+  } else {
+    // Fall Semester: Aug to Dec
+    return {
+      name: 'Fall Semester',
+      startDate: `${year}-08-01`,
+      endDate: `${year}-12-31`,
+    };
+  }
+}
+
 export function getAvailableMonths(
   startDateStr: string,
   endDateStr: string
@@ -147,20 +179,35 @@ export function getAvailableMonths(
   const end = parseDate(endDateStr);
   const list: { key: string; label: string; year: number; month: number }[] = [];
 
-  const cur = new Date(start.getFullYear(), start.getMonth(), 1);
-  const last = new Date(end.getFullYear(), end.getMonth(), 1);
+  if (!isNaN(start.getTime()) && !isNaN(end.getTime()) && start <= end) {
+    const cur = new Date(start.getFullYear(), start.getMonth(), 1);
+    const last = new Date(end.getFullYear(), end.getMonth(), 1);
 
-  while (cur <= last) {
-    const y = cur.getFullYear();
-    const m = cur.getMonth();
-    const key = `${y}-${String(m + 1).padStart(2, '0')}`;
+    while (cur <= last) {
+      const y = cur.getFullYear();
+      const m = cur.getMonth();
+      const key = `${y}-${String(m + 1).padStart(2, '0')}`;
+      list.push({
+        key,
+        label: `${MONTH_NAMES[m]} ${y}`,
+        year: y,
+        month: m,
+      });
+      cur.setMonth(cur.getMonth() + 1);
+    }
+  }
+
+  // Fallback if dates were invalid or start > end
+  if (list.length === 0) {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = now.getMonth();
     list.push({
-      key,
+      key: `${y}-${String(m + 1).padStart(2, '0')}`,
       label: `${MONTH_NAMES[m]} ${y}`,
       year: y,
       month: m,
     });
-    cur.setMonth(cur.getMonth() + 1);
   }
 
   return list;
@@ -224,6 +271,85 @@ export function computeMonthlyStats(
     overallPercentage,
     subjectBreakdowns,
   };
+}
+
+/**
+ * Generates initial past attendance records for a newly added subject if the student
+ * is starting to use AttendX mid-semester with existing conducted & attended counts.
+ */
+export function generateRetroactiveAttendance(
+  subjectId: string,
+  conductedCount: number,
+  attendedCount: number,
+  scheduledDays: number[] = [1, 2, 3, 4, 5],
+  startDateStr: string,
+  beforeDate: Date = new Date()
+): AttendanceRecord[] {
+  if (conductedCount <= 0) return [];
+  const safeAttended = Math.min(attendedCount, conductedCount);
+  const safeAbsent = conductedCount - safeAttended;
+
+  const records: AttendanceRecord[] = [];
+  const cur = parseDate(startDateStr);
+  const cutoff = new Date(beforeDate);
+  cutoff.setHours(0, 0, 0, 0);
+
+  // Collect candidate past class dates based on scheduledDays
+  const candidateDates: string[] = [];
+  while (cur < cutoff && candidateDates.length < conductedCount * 2) {
+    const dayOfWeek = cur.getDay();
+    if (scheduledDays.length === 0 || scheduledDays.includes(dayOfWeek)) {
+      candidateDates.push(formatDate(cur));
+    }
+    cur.setDate(cur.getDate() + 1);
+  }
+
+  // Pick the most recent conductedCount dates prior to today (or generate recent past weekdays)
+  let selectedDates = candidateDates.slice(-conductedCount);
+  if (selectedDates.length < conductedCount) {
+    // If not enough days in range, backfill prior weekdays
+    const backfill: string[] = [];
+    const backCur = new Date(cutoff);
+    backCur.setDate(backCur.getDate() - 1);
+    while (backfill.length < conductedCount) {
+      const dayOfWeek = backCur.getDay();
+      if (scheduledDays.length === 0 || scheduledDays.includes(dayOfWeek)) {
+        backfill.unshift(formatDate(backCur));
+      }
+      backCur.setDate(backCur.getDate() - 1);
+    }
+    selectedDates = backfill;
+  }
+
+  let remainingAbsences = safeAbsent;
+  let remainingPresents = safeAttended;
+  const step = safeAbsent > 0 ? Math.max(1, Math.floor(conductedCount / safeAbsent)) : 1;
+
+  for (let i = 0; i < selectedDates.length; i++) {
+    const dateStr = selectedDates[i];
+    let status: 'present' | 'absent' = 'present';
+
+    if (remainingAbsences > 0) {
+      if (remainingPresents === 0 || (i % step === 0)) {
+        status = 'absent';
+        remainingAbsences--;
+      } else {
+        remainingPresents--;
+      }
+    } else {
+      remainingPresents--;
+    }
+
+    records.push({
+      id: `rec-${dateStr}-${subjectId}`,
+      date: dateStr,
+      subjectId,
+      status,
+      timestamp: parseDate(dateStr).getTime(),
+    });
+  }
+
+  return records;
 }
 
 // Initial Clean Semester Settings (Empty subjects & records by default)

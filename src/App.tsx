@@ -27,8 +27,9 @@ import {
   computeOverallStats,
   formatDate,
   parseDate,
-  DEFAULT_SEMESTER,
-  DEFAULT_SUBJECTS,
+  getCurrentAcademicSemesterDates,
+  generateTeachingDaysRange,
+  generateRetroactiveAttendance,
 } from './utils/attendanceUtils';
 
 import { Navbar, NavTab } from './components/Navbar';
@@ -40,51 +41,33 @@ import { RecoverySimulator } from './components/RecoverySimulator';
 import { AddSubjectModal } from './components/AddSubjectModal';
 import { AddSemesterModal } from './components/AddSemesterModal';
 import { DeleteSemesterModal } from './components/DeleteSemesterModal';
-import { CurriculumPresetsModal } from './components/CurriculumPresetsModal';
-import { buildReadyToUseSemester } from './data/curriculaPresets';
 
 const STORAGE_KEYS = {
-  SEMESTERS: 'student_attendance_semesters_v2',
-  ACTIVE_SEM: 'student_attendance_active_sem_v2',
-  SUBJECTS: 'student_attendance_subjects_v1',
-  RECORDS: 'student_attendance_records_v1',
-  TEACHING_DAYS: 'student_attendance_teaching_days_v1',
-  SEMESTER: 'student_attendance_semester_v1',
+  SEMESTERS: 'attendx_semesters_v3',
+  ACTIVE_SEM: 'attendx_active_sem_v3',
 };
 
-const createCleanSemester = (): SemesterData => ({
-  id: 'sem-1',
-  number: 1,
-  name: 'Semester 1',
-  startDate: '2026-08-01',
-  endDate: '2026-12-31',
-  subjects: [],
-  records: [],
-  teachingDays: {},
-  createdAt: Date.now(),
-});
+const createCleanSemester = (number = 1): SemesterData => {
+  const dates = getCurrentAcademicSemesterDates();
+  return {
+    id: `sem-${number}`,
+    number,
+    name: `Semester ${number}`,
+    startDate: dates.startDate,
+    endDate: dates.endDate,
+    subjects: [],
+    records: [],
+    teachingDays: generateTeachingDaysRange(dates.startDate, dates.endDate, [1, 2, 3, 4, 5]),
+    createdAt: Date.now(),
+  };
+};
 
 const isDemoSubject = (s: Subject) =>
+  s.id.startsWith('subj-cs-') ||
   ['subj-1', 'subj-2', 'subj-3', 'subj-4', 'subj-5'].includes(s.id) ||
-  ['CS-301', 'CS-302', 'CS-303', 'CS-304', 'MATH-201'].includes(s.code);
+  ['CS-301', 'CS-302', 'CS-303', 'CS-304', 'MATH-201', 'EE-301', 'EE-302', 'ME-301', 'BA-301', 'MD-301'].includes(s.code);
 
 const cleanSemesterData = (sem: SemesterData): SemesterData => {
-  const isDemo =
-    sem.id === 'sem-5' &&
-    (!sem.subjects || sem.subjects.length === 0 || sem.subjects.every(isDemoSubject));
-
-  if (isDemo) {
-    return {
-      ...sem,
-      id: 'sem-1',
-      number: 1,
-      name: sem.name === 'Semester 5' ? 'Semester 1' : sem.name,
-      subjects: [],
-      records: [],
-      teachingDays: {},
-    };
-  }
-
   const realSubjects = (sem.subjects || []).filter((s) => !isDemoSubject(s));
   const realSubjectIds = new Set(realSubjects.map((s) => s.id));
   const realRecords = (sem.records || []).filter((r) => realSubjectIds.has(r.subjectId));
@@ -99,29 +82,27 @@ const cleanSemesterData = (sem: SemesterData): SemesterData => {
 const getInitialSemesters = (): SemesterData[] => {
   try {
     // Purge legacy demo-only storage keys
-    localStorage.removeItem(STORAGE_KEYS.SUBJECTS);
-    localStorage.removeItem(STORAGE_KEYS.RECORDS);
-    localStorage.removeItem(STORAGE_KEYS.TEACHING_DAYS);
-    localStorage.removeItem(STORAGE_KEYS.SEMESTER);
+    localStorage.removeItem('student_attendance_semesters_v2');
+    localStorage.removeItem('student_attendance_active_sem_v2');
+    localStorage.removeItem('student_attendance_subjects_v1');
+    localStorage.removeItem('student_attendance_records_v1');
+    localStorage.removeItem('student_attendance_teaching_days_v1');
+    localStorage.removeItem('student_attendance_semester_v1');
 
     const saved = localStorage.getItem(STORAGE_KEYS.SEMESTERS);
     if (saved) {
       const parsed = JSON.parse(saved);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        // If there is an existing semester with subjects, keep user's configured state
-        const hasSubjects = parsed.some((s) => s.subjects && s.subjects.length > 0);
-        if (hasSubjects) {
-          return parsed;
-        }
+        const cleaned = parsed.map(cleanSemesterData);
+        return cleaned;
       }
     }
-    // Out of the box, provide a complete, ready-to-use curriculum so users can directly use & deploy without typing
-    const initial = [buildReadyToUseSemester('cs', new Date())];
+    const initial = [createCleanSemester(1)];
     localStorage.setItem(STORAGE_KEYS.SEMESTERS, JSON.stringify(initial));
     return initial;
   } catch (e) {
     console.error(e);
-    return [buildReadyToUseSemester('cs', new Date())];
+    return [createCleanSemester(1)];
   }
 };
 
@@ -130,9 +111,9 @@ export default function App() {
   const [activeSemesterId, setActiveSemesterId] = useState<string>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.ACTIVE_SEM);
-      if (saved) return saved;
+      if (saved && saved !== 'sem-cs-1' && saved !== 'sem-5') return saved;
     } catch (e) {}
-    return 'sem-cs-1';
+    return 'sem-1';
   });
 
   // Current active semester data
@@ -153,7 +134,6 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
   const [simulatorSubjectId, setSimulatorSubjectId] = useState<string | undefined>(undefined);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [isPresetsModalOpen, setIsPresetsModalOpen] = useState(false);
   const [isAddSemesterModalOpen, setIsAddSemesterModalOpen] = useState(false);
   const [semesterToDelete, setSemesterToDelete] = useState<SemesterData | null>(null);
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
@@ -191,17 +171,47 @@ export default function App() {
     });
   };
 
-  // Switch to a preloaded curriculum preset
-  const handleApplyPreset = (presetId: string) => {
-    const newSemester = buildReadyToUseSemester(presetId, new Date());
-    updateCurrentSemester(() => ({
-      name: newSemester.name,
-      startDate: newSemester.startDate,
-      endDate: newSemester.endDate,
-      subjects: newSemester.subjects,
-      records: newSemester.records,
-      teachingDays: newSemester.teachingDays,
-    }));
+  const handleExportData = () => {
+    try {
+      const dataStr = JSON.stringify(semesters, null, 2);
+      const blob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `attendx-backup-${formatDate(new Date())}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      alert('Could not export backup.');
+    }
+  };
+
+  const handleImportData = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const content = event.target?.result as string;
+        const parsed = JSON.parse(content);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const cleaned = parsed.map(cleanSemesterData);
+          setSemesters(cleaned);
+          setActiveSemesterId(cleaned[0].id);
+          alert('AttendX backup successfully restored!');
+        } else {
+          alert('Invalid backup format. Please select a valid AttendX JSON export.');
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Could not read backup file.');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
   };
 
   const handleResetToClean = () => {
@@ -298,22 +308,52 @@ export default function App() {
     });
   };
 
-  const handleSaveSubject = (subjectData: Omit<Subject, 'id'>, editId?: string) => {
+  const handleSaveSubject = (
+    subjectData: Omit<Subject, 'id'>,
+    editId?: string,
+    initialAttendance?: { conducted: number; attended: number }
+  ) => {
     updateCurrentSemester((sem) => {
       const currentSubjs = sem.subjects || [];
       if (editId) {
         return {
           subjects: currentSubjs.map((s) =>
-            s.id === editId ? { ...s, ...subjectData, targetPercentage: 100 } : s
+            s.id === editId
+              ? {
+                  ...s,
+                  ...subjectData,
+                  targetPercentage: subjectData.targetPercentage ?? s.targetPercentage ?? 85,
+                }
+              : s
           ),
         };
       } else {
+        const newSubjId = `subj-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
         const newSubject: Subject = {
           ...subjectData,
-          id: `subj-${Date.now()}`,
-          targetPercentage: 100,
+          id: newSubjId,
+          targetPercentage: subjectData.targetPercentage ?? 85,
         };
-        return { subjects: [...currentSubjs, newSubject] };
+
+        let updatedRecords = sem.records || [];
+        if (initialAttendance && initialAttendance.conducted > 0) {
+          const retroRecords = generateRetroactiveAttendance(
+            newSubjId,
+            initialAttendance.conducted,
+            initialAttendance.attended,
+            subjectData.scheduledDays && subjectData.scheduledDays.length > 0
+              ? subjectData.scheduledDays
+              : [1, 2, 3, 4, 5],
+            sem.startDate,
+            new Date()
+          );
+          updatedRecords = [...updatedRecords, ...retroRecords];
+        }
+
+        return {
+          subjects: [...currentSubjs, newSubject],
+          records: updatedRecords,
+        };
       }
     });
   };
@@ -387,7 +427,8 @@ export default function App() {
           setEditingSubject(null);
           setIsAddModalOpen(true);
         }}
-        onOpenPresets={() => setIsPresetsModalOpen(true)}
+        onExportData={handleExportData}
+        onImportData={handleImportData}
         onResetData={handleResetData}
         overallPercentage={overallStats.percentage}
         overallRecoveryNeeded={overallStats.recoveryNeeded}
@@ -699,26 +740,18 @@ export default function App() {
                   </button>
                 </div>
 
-                <button
-                  id="dashboard-mark-all-today-btn"
-                  onClick={handleMarkAllTodayPresent}
-                  title="Mark all today's scheduled classes as Present in one click"
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-emerald-700 active:scale-95 transition-all shrink-0"
-                >
-                  <CheckCheck className="h-4 w-4 shrink-0" />
-                  <span className="hidden xs:inline">Mark Today</span>
-                  <span className="xs:hidden">Today</span>
-                </button>
-
-                <button
-                  id="dashboard-curricula-presets-btn"
-                  onClick={() => setIsPresetsModalOpen(true)}
-                  title="Browse or switch academic curricula presets"
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-all shrink-0"
-                >
-                  <Sparkles className="h-4 w-4 text-amber-500 shrink-0" />
-                  <span className="hidden xs:inline">Curricula</span>
-                </button>
+                {subjects.length > 0 && (
+                  <button
+                    id="dashboard-mark-all-today-btn"
+                    onClick={handleMarkAllTodayPresent}
+                    title="Mark all today's scheduled classes as Present in one click"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-emerald-700 active:scale-95 transition-all shrink-0"
+                  >
+                    <CheckCheck className="h-4 w-4 shrink-0" />
+                    <span className="hidden xs:inline">Mark Today</span>
+                    <span className="xs:hidden">Today</span>
+                  </button>
+                )}
 
                 <button
                   id="dashboard-add-subject-btn"
@@ -737,7 +770,7 @@ export default function App() {
             {/* Subject Cards Grid */}
             {displayedSubjects.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-slate-300 p-10 sm:p-14 text-center dark:border-slate-800">
-                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-500 mb-3 dark:bg-slate-800 dark:text-slate-400">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 mb-3 dark:bg-blue-950/50 dark:text-blue-400">
                   <BookOpen className="h-6 w-6" />
                 </div>
                 <h3 className="text-base font-bold text-slate-800 dark:text-slate-200">
@@ -745,33 +778,25 @@ export default function App() {
                     ? 'Great news! No missed classes in any subject.'
                     : dashboardFilter === 'perfect'
                     ? 'No subjects currently at 100% attendance.'
-                    : `No subjects in ${currentSemester.name} yet.`}
+                    : `Welcome to AttendX! No subjects in ${currentSemester.name} yet.`}
                 </h3>
                 <p className="mt-1 text-xs text-slate-500 max-w-sm mx-auto">
                   {dashboardFilter === 'all'
-                    ? 'Load a pre-configured university curriculum preset in one click, or add your own custom courses.'
+                    ? 'Add your actual university courses to start tracking classes, calculating required attendance, and simulating recovery.'
                     : 'Switch filters or add new courses to see them here.'}
                 </p>
                 {dashboardFilter === 'all' && (
                   <div className="mt-5 flex flex-wrap items-center justify-center gap-2.5">
-                    <button
-                      id="empty-state-load-preset-btn"
-                      onClick={() => setIsPresetsModalOpen(true)}
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:from-blue-700 hover:to-indigo-700 transition-all active:scale-95"
-                    >
-                      <Sparkles className="h-4 w-4 text-amber-300" />
-                      <span>Load Curriculum Preset</span>
-                    </button>
                     <button
                       id="empty-state-add-course-btn"
                       onClick={() => {
                         setEditingSubject(null);
                         setIsAddModalOpen(true);
                       }}
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 transition-all active:scale-95"
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-blue-700 transition-all active:scale-95"
                     >
                       <Plus className="h-4 w-4" />
-                      <span>Add Course</span>
+                      <span>Add Your First Course</span>
                     </button>
                   </div>
                 )}
@@ -805,6 +830,10 @@ export default function App() {
             onUpdateRecord={handleUpdateRecord}
             onClearDateRecords={handleClearDateRecords}
             onToggleTeachingDay={handleToggleTeachingDay}
+            onOpenAddSubject={() => {
+              setEditingSubject(null);
+              setIsAddModalOpen(true);
+            }}
           />
         )}
 
@@ -873,15 +902,6 @@ export default function App() {
         onClose={() => setSemesterToDelete(null)}
         onConfirmDelete={handleConfirmDeleteSemester}
         isOnlySemester={semesters.length <= 1}
-      />
-
-      {/* Curriculum Presets & Templates Modal */}
-      <CurriculumPresetsModal
-        isOpen={isPresetsModalOpen}
-        onClose={() => setIsPresetsModalOpen(false)}
-        onSelectPreset={handleApplyPreset}
-        onResetToClean={handleResetToClean}
-        currentSubjectCount={subjects.length}
       />
     </div>
   );

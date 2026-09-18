@@ -5,7 +5,11 @@ import { Subject } from '../types';
 interface AddSubjectModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (subject: Omit<Subject, 'id'>, editId?: string) => void;
+  onSave: (
+    subject: Omit<Subject, 'id'>,
+    editId?: string,
+    initialAttendance?: { conducted: number; attended: number }
+  ) => void;
   editingSubject?: Subject | null;
 }
 
@@ -29,6 +33,8 @@ const DAYS_OF_WEEK = [
   { day: 0, label: 'Sun' },
 ];
 
+const TARGET_PRESETS = [75, 80, 85, 90, 100];
+
 export const AddSubjectModal: React.FC<AddSubjectModalProps> = ({
   isOpen,
   onClose,
@@ -39,12 +45,15 @@ export const AddSubjectModal: React.FC<AddSubjectModalProps> = ({
   const [code, setCode] = useState(editingSubject?.code || '');
   const [color, setColor] = useState(editingSubject?.color || 'emerald');
   const [targetPercentage, setTargetPercentage] = useState(
-    editingSubject?.targetPercentage ?? 90
+    editingSubject?.targetPercentage ?? 85
   );
   const [scheduledDays, setScheduledDays] = useState<number[]>(
-    editingSubject?.scheduledDays || [1, 3, 5]
+    editingSubject?.scheduledDays || [1, 2, 3, 4, 5]
   );
   const [credits, setCredits] = useState(editingSubject?.credits || 3);
+  const [hasExistingAttendance, setHasExistingAttendance] = useState(false);
+  const [initialConducted, setInitialConducted] = useState<number>(0);
+  const [initialAttended, setInitialAttended] = useState<number>(0);
   const [error, setError] = useState('');
 
   if (!isOpen) return null;
@@ -60,7 +69,12 @@ export const AddSubjectModal: React.FC<AddSubjectModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
-      setError('Please enter a subject name');
+      setError('Please enter a course or subject name');
+      return;
+    }
+
+    if (hasExistingAttendance && initialAttended > initialConducted) {
+      setError('Attended classes cannot exceed total conducted classes');
       return;
     }
 
@@ -69,11 +83,14 @@ export const AddSubjectModal: React.FC<AddSubjectModalProps> = ({
         name: name.trim(),
         code: code.trim() || name.slice(0, 3).toUpperCase() + '-101',
         color,
-        targetPercentage: Number(targetPercentage) || 90,
+        targetPercentage: Number(targetPercentage) || 85,
         credits: Number(credits) || 3,
         scheduledDays,
       },
-      editingSubject?.id
+      editingSubject?.id,
+      !editingSubject && hasExistingAttendance && initialConducted > 0
+        ? { conducted: Number(initialConducted), attended: Number(initialAttended) }
+        : undefined
     );
 
     onClose();
@@ -87,7 +104,7 @@ export const AddSubjectModal: React.FC<AddSubjectModalProps> = ({
     >
       <div
         id="add-subject-modal-container"
-        className="relative w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl transition-all dark:bg-slate-900 border border-slate-200 dark:border-slate-800"
+        className="relative w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl transition-all dark:bg-slate-900 border border-slate-200 dark:border-slate-800 my-8"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-slate-100 pb-4 dark:border-slate-800">
@@ -96,11 +113,11 @@ export const AddSubjectModal: React.FC<AddSubjectModalProps> = ({
               <BookOpen className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
-                {editingSubject ? 'Edit Subject' : 'Add New Subject'}
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+                {editingSubject ? 'Edit Subject' : 'Add Subject'}
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Configure your course details and 90% attendance target
+                Configure your course schedule and attendance criteria
               </p>
             </div>
           </div>
@@ -122,13 +139,13 @@ export const AddSubjectModal: React.FC<AddSubjectModalProps> = ({
         <form onSubmit={handleSubmit} className="mt-4 space-y-4">
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1">
-              Subject Name <span className="text-rose-500">*</span>
+              Subject / Course Name <span className="text-rose-500">*</span>
             </label>
             <input
               id="subject-name-input"
               type="text"
               required
-              placeholder="e.g. Data Structures & Algorithms"
+              placeholder="e.g. Mathematics, Operating Systems, Chemistry"
               value={name}
               onChange={(e) => {
                 setName(e.target.value);
@@ -141,12 +158,12 @@ export const AddSubjectModal: React.FC<AddSubjectModalProps> = ({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1">
-                Subject Code
+                Course Code (Optional)
               </label>
               <input
                 id="subject-code-input"
                 type="text"
-                placeholder="e.g. CS-301"
+                placeholder="e.g. CS101, MATH201"
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
                 className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-hidden dark:border-slate-700 dark:bg-slate-800 dark:text-white"
@@ -173,9 +190,30 @@ export const AddSubjectModal: React.FC<AddSubjectModalProps> = ({
             </div>
           </div>
 
+          {/* Quick Target Presets */}
+          <div className="flex items-center gap-1.5 pt-0.5">
+            <span className="text-[11px] font-medium text-slate-500">Quick Target:</span>
+            <div className="flex items-center gap-1">
+              {TARGET_PRESETS.map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setTargetPercentage(t)}
+                  className={`rounded-md px-2 py-0.5 text-[11px] font-bold transition-all ${
+                    targetPercentage === t
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'
+                  }`}
+                >
+                  {t}%
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
-              Weekly Teaching Days (Lecture Days)
+              Weekly Timetable Days
             </label>
             <div className="flex flex-wrap gap-1.5">
               {DAYS_OF_WEEK.map(({ day, label }) => {
@@ -186,7 +224,7 @@ export const AddSubjectModal: React.FC<AddSubjectModalProps> = ({
                     type="button"
                     id={`toggle-day-${day}-btn`}
                     onClick={() => toggleDay(day)}
-                    className={`flex h-9 min-w-10 items-center justify-center rounded-xl px-2 text-xs font-medium transition-all ${
+                    className={`flex h-9 min-w-10 items-center justify-center rounded-xl px-2.5 text-xs font-bold transition-all ${
                       isSelected
                         ? 'bg-blue-600 text-white shadow-xs'
                         : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
@@ -197,14 +235,11 @@ export const AddSubjectModal: React.FC<AddSubjectModalProps> = ({
                 );
               })}
             </div>
-            <p className="mt-1 text-[11px] text-slate-500">
-              Days when lectures are held for this course.
-            </p>
           </div>
 
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-2">
-              Card Color Accent
+              Color Tag
             </label>
             <div className="flex flex-wrap gap-2">
               {COLOR_OPTIONS.map((opt) => (
@@ -223,6 +258,54 @@ export const AddSubjectModal: React.FC<AddSubjectModalProps> = ({
               ))}
             </div>
           </div>
+
+          {/* Starting Mid-Semester Baseline option */}
+          {!editingSubject && (
+            <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5 dark:border-slate-800 dark:bg-slate-800/50">
+              <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700 dark:text-slate-300">
+                <input
+                  type="checkbox"
+                  checked={hasExistingAttendance}
+                  onChange={(e) => setHasExistingAttendance(e.target.checked)}
+                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4"
+                />
+                <span>Starting mid-semester? Enter classes held so far</span>
+              </label>
+
+              {hasExistingAttendance && (
+                <div className="mt-3 grid grid-cols-2 gap-3 pt-2 border-t border-slate-200 dark:border-slate-700">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                      Total Classes Held:
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="200"
+                      value={initialConducted}
+                      onChange={(e) => setInitialConducted(Math.max(0, Number(e.target.value)))}
+                      className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                      placeholder="e.g. 15"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                      Classes Attended:
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max={initialConducted}
+                      value={initialAttended}
+                      onChange={(e) => setInitialAttended(Math.max(0, Number(e.target.value)))}
+                      className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                      placeholder="e.g. 13"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800">
             <button

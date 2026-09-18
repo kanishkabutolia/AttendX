@@ -6,11 +6,12 @@ import {
   BarChart3,
   Calculator,
   Plus,
-  Sparkles,
   GraduationCap,
   ChevronDown,
   Check,
   Trash2,
+  Download,
+  Upload,
 } from 'lucide-react';
 import { SemesterData } from '../types';
 
@@ -20,7 +21,8 @@ interface NavbarProps {
   activeTab: NavTab;
   onTabChange: (tab: NavTab) => void;
   onOpenAddSubject: () => void;
-  onOpenPresets?: () => void;
+  onExportData?: () => void;
+  onImportData?: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onResetData: () => void;
   overallPercentage: number;
   overallRecoveryNeeded: number;
@@ -35,7 +37,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   activeTab,
   onTabChange,
   onOpenAddSubject,
-  onOpenPresets,
+  onExportData,
+  onImportData,
   overallPercentage,
   semesters = [],
   activeSemesterId,
@@ -256,17 +259,34 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span className="hidden sm:inline text-[10px] opacity-70">/ 100%</span>
             </div>
 
-            {/* Presets / Quick Setup Button */}
-            {onOpenPresets && (
+            {/* Export & Import Backup */}
+            {onExportData && (
               <button
-                id="open-presets-btn"
-                onClick={onOpenPresets}
-                title="Curriculum Presets & Templates"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-all shadow-2xs shrink-0"
+                id="export-backup-btn"
+                onClick={onExportData}
+                title="Export AttendX Backup (JSON)"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 sm:px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-all shadow-2xs shrink-0"
               >
-                <Sparkles className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-                <span className="hidden sm:inline">Curricula</span>
+                <Download className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400 shrink-0" />
+                <span className="hidden md:inline">Backup</span>
               </button>
+            )}
+
+            {onImportData && (
+              <label
+                id="import-backup-label"
+                title="Restore AttendX Backup (JSON)"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 sm:px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 active:scale-95 transition-all shadow-2xs shrink-0 cursor-pointer"
+              >
+                <Upload className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400 shrink-0" />
+                <span className="hidden md:inline">Restore</span>
+                <input
+                  type="file"
+                  accept=".json,application/json"
+                  onChange={onImportData}
+                  className="hidden"
+                />
+              </label>
             )}
 
             {/* Add Subject Primary CTA */}

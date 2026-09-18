@@ -57,19 +57,23 @@ export const TeachingDaysPlanner: React.FC<TeachingDaysPlannerProps> = ({
     semester.regularWeeklyTeachingDays || [1, 2, 3, 4, 5]
   );
   
-  // Year and Month for the current planner view (defaults to September 2026)
-  const [viewYear, setViewYear] = useState<number>(2026);
-  const [viewMonth, setViewMonth] = useState<number>(8); // 8 = September (0-indexed)
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const currentMonth = today.getMonth();
+
+  // Year and Month for the current planner view (defaults to current month)
+  const [viewYear, setViewYear] = useState<number>(currentYear);
+  const [viewMonth, setViewMonth] = useState<number>(currentMonth);
   const [markingBrush, setMarkingBrush] = useState<MarkingBrush>('cycle');
 
   // Month navigation: list of 8 months centered around current semester & upcoming
   const baseMonths: { year: number; month: number; key: string; label: string; isCurrent: boolean; isUpcoming: boolean }[] = [];
-  for (let offset = -1; offset <= 7; offset++) {
-    const d = new Date(2026, 8 + offset, 1);
+  for (let offset = -2; offset <= 6; offset++) {
+    const d = new Date(currentYear, currentMonth + offset, 1);
     const y = d.getFullYear();
     const m = d.getMonth();
-    const isCurrent = y === 2026 && m === 8;
-    const isUpcoming = y > 2026 || (y === 2026 && m > 8);
+    const isCurrent = y === currentYear && m === currentMonth;
+    const isUpcoming = y > currentYear || (y === currentYear && m > currentMonth);
     baseMonths.push({
       year: y,
       month: m,
@@ -85,8 +89,8 @@ export const TeachingDaysPlanner: React.FC<TeachingDaysPlannerProps> = ({
     month: viewMonth,
     key: `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}`,
     label: `${MONTH_NAMES[viewMonth]} ${viewYear}`,
-    isCurrent: viewYear === 2026 && viewMonth === 8,
-    isUpcoming: viewYear > 2026 || (viewYear === 2026 && viewMonth > 8),
+    isCurrent: viewYear === currentYear && viewMonth === currentMonth,
+    isUpcoming: viewYear > currentYear || (viewYear === currentYear && viewMonth > currentMonth),
   };
 
   const handlePrevMonth = () => {

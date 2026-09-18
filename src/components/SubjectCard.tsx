@@ -140,14 +140,24 @@ export const SubjectCard: React.FC<SubjectCardProps> = ({
 
         {/* 100% COMPARISON & ABSENCE NOTICE (Overview) */}
         <div className="mt-4">
-          {!isPerfect ? (
+          {totalConducted === 0 ? (
+            <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3 text-xs text-slate-700 dark:border-slate-800 dark:bg-slate-850 dark:text-slate-300">
+              <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-200">
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-blue-500" />
+                <span>Ready to Track (Target: {subject.targetPercentage || 85}%)</span>
+              </div>
+              <p className="mt-1 font-medium leading-relaxed text-slate-500 dark:text-slate-400">
+                No classes recorded yet. Mark attendance daily or use the quick buttons below when classes are held!
+              </p>
+            </div>
+          ) : !isPerfect ? (
             <div className="rounded-xl border border-rose-200 bg-rose-50/80 p-3 text-xs text-rose-900 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-200">
               <div className="flex items-center gap-1.5 font-bold text-rose-700 dark:text-rose-300">
                 <AlertTriangle className="h-4 w-4 shrink-0 text-rose-600 dark:text-rose-400" />
                 <span>Attendance Gap: {absentCount} missed {absentCount === 1 ? 'class' : 'classes'}</span>
               </div>
               <p className="mt-1 font-medium leading-relaxed">
-                Currently at <span className="font-bold">{percentage}%</span> out of 100%. Attend upcoming lectures without absences to maintain the highest possible attendance rate.
+                Currently at <span className="font-bold">{percentage}%</span> (Target: {subject.targetPercentage || 85}%). Attend upcoming lectures without absences to maintain the highest possible attendance rate.
               </p>
             </div>
           ) : (

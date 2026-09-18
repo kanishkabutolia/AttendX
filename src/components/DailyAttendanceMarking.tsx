@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { Subject, AttendanceRecord, TeachingDay } from '../types';
 import { formatDate, parseDate, COLOR_MAP } from '../utils/attendanceUtils';
+import { Plus } from 'lucide-react';
 
 interface DailyAttendanceMarkingProps {
   subjects: Subject[];
@@ -23,6 +24,7 @@ interface DailyAttendanceMarkingProps {
   onUpdateRecord: (date: string, subjectId: string, status: 'present' | 'absent' | 'cancelled', note?: string) => void;
   onClearDateRecords: (date: string) => void;
   onToggleTeachingDay: (date: string) => void;
+  onOpenAddSubject?: () => void;
 }
 
 export const DailyAttendanceMarking: React.FC<DailyAttendanceMarkingProps> = ({
@@ -32,6 +34,7 @@ export const DailyAttendanceMarking: React.FC<DailyAttendanceMarkingProps> = ({
   onUpdateRecord,
   onClearDateRecords,
   onToggleTeachingDay,
+  onOpenAddSubject,
 }) => {
   const TODAY_STR = formatDate(new Date());
   const [selectedDate, setSelectedDate] = useState<string>(TODAY_STR);
@@ -306,7 +309,17 @@ export const DailyAttendanceMarking: React.FC<DailyAttendanceMarkingProps> = ({
       <div className="space-y-3">
         {subjects.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center dark:border-slate-700">
-            <p className="text-sm text-slate-500">No subjects listed yet. Click &quot;Add Subject&quot; to begin!</p>
+            <p className="text-sm text-slate-500 mb-3">No subjects listed in this semester yet.</p>
+            {onOpenAddSubject && (
+              <button
+                type="button"
+                onClick={onOpenAddSubject}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 transition-colors"
+              >
+                <Plus className="h-4 w-4" />
+                <span>Add Your First Subject</span>
+              </button>
+            )}
           </div>
         ) : (
           subjects.map((subject) => {

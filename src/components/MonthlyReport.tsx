@@ -45,13 +45,21 @@ export const MonthlyReport: React.FC<MonthlyReportProps> = ({
 }) => {
   const availableMonths = getAvailableMonths(semester.startDate, semester.endDate);
   
-  // Default to September 2026 (or first available)
+  const today = new Date();
+  const currentMonthIdx = availableMonths.findIndex(
+    (m) => m.month === today.getMonth() && m.year === today.getFullYear()
+  );
+
   const [selectedMonthIndex, setSelectedMonthIndex] = useState<number>(() => {
-    const sepIndex = availableMonths.findIndex((m) => m.month === 8 && m.year === 2026); // September is month 8 (0-indexed)
-    return sepIndex >= 0 ? sepIndex : 0;
+    return currentMonthIdx >= 0 ? currentMonthIdx : 0;
   });
 
-  const activeMonth = availableMonths[selectedMonthIndex] || availableMonths[0];
+  const activeMonth = availableMonths[selectedMonthIndex] || availableMonths[0] || {
+    key: `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`,
+    label: `${MONTH_NAMES[today.getMonth()]} ${today.getFullYear()}`,
+    year: today.getFullYear(),
+    month: today.getMonth(),
+  };
 
   const stats = computeMonthlyStats(
     activeMonth.year,

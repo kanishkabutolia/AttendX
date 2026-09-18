@@ -18,15 +18,24 @@ export const AddSemesterModal: React.FC<AddSemesterModalProps> = ({
   existingSemesters,
   currentSubjects,
 }) => {
-  // Suggest next semester number (e.g. if 5 exists, suggest 6)
-  const maxSemNumber = existingSemesters.reduce((max, s) => Math.max(max, s.number || 0), 5);
-  const defaultNextNumber = maxSemNumber + 1;
+  const currentYear = new Date().getFullYear();
+  const maxSemNumber = existingSemesters.reduce((max, s) => Math.max(max, s.number || 0), 0);
+  const defaultNextNumber = maxSemNumber > 0 ? maxSemNumber + 1 : 1;
 
   const [semNumber, setSemNumber] = useState<number>(defaultNextNumber);
   const [semName, setSemName] = useState<string>(`Semester ${defaultNextNumber}`);
-  const [startDate, setStartDate] = useState<string>('2027-01-15');
-  const [endDate, setEndDate] = useState<string>('2027-05-31');
+  const [startDate, setStartDate] = useState<string>(`${currentYear}-08-01`);
+  const [endDate, setEndDate] = useState<string>(`${currentYear}-12-31`);
   const [copySubjects, setCopySubjects] = useState<boolean>(false);
+
+  // Sync defaults when modal opens
+  React.useEffect(() => {
+    if (isOpen) {
+      const nextNum = existingSemesters.reduce((max, s) => Math.max(max, s.number || 0), 0) + 1;
+      setSemNumber(nextNum);
+      setSemName(`Semester ${nextNum}`);
+    }
+  }, [isOpen, existingSemesters]);
 
   if (!isOpen) return null;
 
